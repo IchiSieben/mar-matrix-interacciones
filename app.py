@@ -53,25 +53,30 @@ def read_pairs(path: Path) -> pd.DataFrame:
     else:
         df = pd.read_csv(path)
 
+    # nombres de columnas en minúsculas
+    df.columns = [c.lower() for c in df.columns]
+
     # columnas mínimas
     need = {"drug_a", "drug_b", "severity", "documentation", "summary"}
-    missing = need - set(map(str.lower, df.columns))
-    # normaliza nombres de columnas a lower
-    df.columns = [c.lower() for c in df.columns]
+    missing = need - set(df.columns)
     if missing:
         st.error(f"Faltan columnas en {path.name}: {missing}")
         st.stop()
 
-    # normaliza severidad
-    df["severity"] = df["severity"].fillna("Unspecified").astype(str)
-    cat = pd.Categorical(df["severity"], SEV_ORDER, ordered=True)
-    df["severity"] = cat.astype(str).where(~pd.isna(cat), "Unspecified")
+    # --- Normalización robusta de 'severity' ---
+    sev = df["severity"].astype("string").fillna("Unspecified")
+    sev_cat = pd.Series(
+        pd.Categorical(sev, categories=SEV_ORDER, ordered=True),
+        index=df.index
+    )
+    df["severity"] = sev_cat.astype("string").fillna("Unspecified")
 
-    # limpieza rápida de strings
+    # limpieza de strings (¡usa .str.strip()!)
     for c in ["drug_a", "drug_b", "documentation", "summary"]:
-        df[c] = df[c].astype(str).str.strip()
+        df[c] = df[c].astype("string").str.strip()
 
     return df
+
 
 path = pick_input_file()
 df = read_pairs(path)
